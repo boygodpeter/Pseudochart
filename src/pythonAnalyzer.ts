@@ -188,6 +188,11 @@ class FlowchartGenerator(ast.NodeVisitor):
                 self.line_to_node[line] = []
             self.line_to_node[line].append(node_id)
     
+    def is_loop_node(self, node_id):
+        """判斷節點是否為迴圈節點（for 或 while）"""
+        node_label = self.node_meta.get(node_id, {}).get('label', '')
+        return 'while ' in node_label or 'for ' in node_label
+    
     def add_node(self, node_id, label, shape='rectangle', style=None, source_node=None):
         """添加節點到 Mermaid 圖"""
         escaped_label = self.escape_text(label)
@@ -274,7 +279,11 @@ class FlowchartGenerator(ast.NodeVisitor):
         # 優先使用 current_node（主程式最後執行的節點）
         if self.current_node:
             if self.current_node == self.pending_no_label:
-                self.add_edge(self.current_node, end_node, 'No')
+                # 如果是迴圈節點，使用 End 標籤；否則使用 No 標籤
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, end_node, 'End')
+                else:
+                    self.add_edge(self.current_node, end_node, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, end_node)
@@ -283,7 +292,10 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node_id in self.branch_ends:
                 if end_node_id:
                     if end_node_id == self.pending_no_label:
-                        self.add_edge(end_node_id, end_node, 'No')
+                        if self.is_loop_node(end_node_id):
+                            self.add_edge(end_node_id, end_node, 'End')
+                        else:
+                            self.add_edge(end_node_id, end_node, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node_id, end_node)
@@ -406,7 +418,10 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        self.add_edge(end_node, if_id, 'No')
+                        if self.is_loop_node(end_node):
+                            self.add_edge(end_node, if_id, 'End')
+                        else:
+                            self.add_edge(end_node, if_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, if_id)
@@ -567,22 +582,20 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        node_label = self.node_meta.get(end_node, {}).get('label', '')
-                        if 'while' in node_label or 'for' in node_label:
+                        if self.is_loop_node(end_node):
                             self.add_edge(end_node, for_id, 'End')
                         else:
-                            self.add_edge(end_node, for_id, 'End')
+                            self.add_edge(end_node, for_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, for_id)
             self.branch_ends = []
         elif self.current_node:
             if self.current_node == self.pending_no_label:
-                node_label = self.node_meta.get(self.current_node, {}).get('label', '')
-                if 'while' in node_label or 'for' in node_label:
+                if self.is_loop_node(self.current_node):
                     self.add_edge(self.current_node, for_id, 'End')
                 else:
-                    self.add_edge(self.current_node, for_id, 'End')
+                    self.add_edge(self.current_node, for_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, for_id)
@@ -627,9 +640,12 @@ class FlowchartGenerator(ast.NodeVisitor):
         
         # 如果迴圈體正常結束，連接回迴圈開始
         if self.current_node and self.current_node != for_id:
-            # 檢查是否需要加 No 標籤（if 節點沒有 else 分支的情況）
+            # 檢查是否需要加標籤（if 節點沒有 else 分支的情況）
             if self.current_node == self.pending_no_label:
-                self.add_edge(self.current_node, for_id, 'End')
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, for_id, 'End')
+                else:
+                    self.add_edge(self.current_node, for_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, for_id)
@@ -643,9 +659,12 @@ class FlowchartGenerator(ast.NodeVisitor):
                     if node_label == 'break' and self.break_to_loop.get(end_node) == for_id:
                         break_nodes.append(end_node)
                     elif node_label != 'break':
-                        # 檢查是否需要加 No 標籤（if 節點沒有 else 分支的情況）
+                        # 檢查是否需要加標籤（if 節點沒有 else 分支的情況）
                         if end_node == self.pending_no_label:
-                            self.add_edge(end_node, for_id, 'End')
+                            if self.is_loop_node(end_node):
+                                self.add_edge(end_node, for_id, 'End')
+                            else:
+                                self.add_edge(end_node, for_id, 'No')
                             self.pending_no_label = None
                         else:
                             self.add_edge(end_node, for_id)
@@ -685,26 +704,20 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        node_label = self.node_meta.get(end_node, {}).get('label', '')
-                        if 'while' in node_label:
-                            self.add_edge(end_node, while_id, 'False')
-                        elif 'for' in node_label:
+                        if self.is_loop_node(end_node):
                             self.add_edge(end_node, while_id, 'End')
                         else:
-                            self.add_edge(end_node, while_id, 'End')
+                            self.add_edge(end_node, while_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, while_id)
             self.branch_ends = []
         elif self.current_node:
             if self.current_node == self.pending_no_label:
-                node_label = self.node_meta.get(self.current_node, {}).get('label', '')
-                if 'while' in node_label:
-                    self.add_edge(self.current_node, while_id, 'False')
-                elif 'for' in node_label:
+                if self.is_loop_node(self.current_node):
                     self.add_edge(self.current_node, while_id, 'End')
                 else:
-                    self.add_edge(self.current_node, while_id, 'End')
+                    self.add_edge(self.current_node, while_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, while_id)
@@ -751,9 +764,12 @@ class FlowchartGenerator(ast.NodeVisitor):
         
         # 迴圈體正常結束，連接回 while
         if self.current_node and self.current_node != while_id:
-            # 檢查是否需要加 No 標籤（if 節點沒有 else 分支的情況）
+            # 檢查是否需要加標籤（if 節點沒有 else 分支的情況）
             if self.current_node == self.pending_no_label:
-                self.add_edge(self.current_node, while_id, 'End')
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, while_id, 'End')
+                else:
+                    self.add_edge(self.current_node, while_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, while_id)
@@ -767,9 +783,12 @@ class FlowchartGenerator(ast.NodeVisitor):
                     if node_label == 'break' and self.break_to_loop.get(end_node) == while_id:
                         break_nodes.append(end_node)
                     elif node_label != 'break':
-                        # 檢查是否需要加 No 標籤（if 節點沒有 else 分支的情況）
+                        # 檢查是否需要加標籤（if 節點沒有 else 分支的情況）
                         if end_node == self.pending_no_label:
-                            self.add_edge(end_node, while_id, 'End')
+                            if self.is_loop_node(end_node):
+                                self.add_edge(end_node, while_id, 'End')
+                            else:
+                                self.add_edge(end_node, while_id, 'No')
                             self.pending_no_label = None
                         else:
                             self.add_edge(end_node, while_id)
@@ -811,7 +830,10 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        self.add_edge(end_node, node_id, 'End')
+                        if self.is_loop_node(end_node):
+                            self.add_edge(end_node, node_id, 'End')
+                        else:
+                            self.add_edge(end_node, node_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, node_id)
@@ -819,7 +841,10 @@ class FlowchartGenerator(ast.NodeVisitor):
         elif self.current_node:
             # 從單一節點連接
             if self.current_node == self.pending_no_label:
-                self.add_edge(self.current_node, node_id, 'End')
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, node_id, 'End')
+                else:
+                    self.add_edge(self.current_node, node_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, node_id)
@@ -980,14 +1005,20 @@ class FlowchartGenerator(ast.NodeVisitor):
                 for end_node in self.branch_ends:
                     if end_node:
                         if end_node == self.pending_no_label:
-                            self.add_edge(end_node, node_id, 'No')
+                            if self.is_loop_node(end_node):
+                                self.add_edge(end_node, node_id, 'End')
+                            else:
+                                self.add_edge(end_node, node_id, 'No')
                             self.pending_no_label = None
                         else:
                             self.add_edge(end_node, node_id)
                 self.branch_ends = []
             elif self.current_node:
                 if self.pending_no_label == self.current_node:
-                    self.add_edge(self.current_node, node_id, 'No')
+                    if self.is_loop_node(self.current_node):
+                        self.add_edge(self.current_node, node_id, 'End')
+                    else:
+                        self.add_edge(self.current_node, node_id, 'No')
                     self.pending_no_label = None
                 else:
                     self.add_edge(self.current_node, node_id)
@@ -1012,14 +1043,20 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        self.add_edge(end_node, node_id, 'No')
+                        if self.is_loop_node(end_node):
+                            self.add_edge(end_node, node_id, 'End')
+                        else:
+                            self.add_edge(end_node, node_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, node_id)
             self.branch_ends = []
         elif self.current_node:
             if self.pending_no_label == self.current_node:
-                self.add_edge(self.current_node, node_id, 'No')
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, node_id, 'End')
+                else:
+                    self.add_edge(self.current_node, node_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, node_id)
@@ -1051,14 +1088,20 @@ class FlowchartGenerator(ast.NodeVisitor):
             for end_node in self.branch_ends:
                 if end_node:
                     if end_node == self.pending_no_label:
-                        self.add_edge(end_node, node_id, 'No')
+                        if self.is_loop_node(end_node):
+                            self.add_edge(end_node, node_id, 'End')
+                        else:
+                            self.add_edge(end_node, node_id, 'No')
                         self.pending_no_label = None
                     else:
                         self.add_edge(end_node, node_id)
             self.branch_ends = []
         elif self.current_node:
             if self.pending_no_label == self.current_node:
-                self.add_edge(self.current_node, node_id, 'No')
+                if self.is_loop_node(self.current_node):
+                    self.add_edge(self.current_node, node_id, 'End')
+                else:
+                    self.add_edge(self.current_node, node_id, 'No')
                 self.pending_no_label = None
             else:
                 self.add_edge(self.current_node, node_id)
