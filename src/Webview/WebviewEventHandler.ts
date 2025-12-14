@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { AppState } from '../state';
+import { nodeIdStringIsStartOrEnd} from '../utils';
 
 // decoration type (top-level, cache it)
 const highlightDecorationType = vscode.window.createTextEditorDecorationType({
@@ -12,10 +13,6 @@ export class WebviewEventHandler {
 
 	constructor(state: AppState) {
 		this.state = state;
-	}
-
-	private nodeIdStringIsStartOrEnd(nodeId: string): boolean {
-		return nodeId === 'Start' || nodeId === 'End';
 	}
 
 	// event trigger when:
@@ -36,7 +33,7 @@ export class WebviewEventHandler {
 		// special case
 		// check not special case;
 		// o.w. exit and clear highlight
-		if (this.nodeIdStringIsStartOrEnd(message.nodeId)) {
+		if (nodeIdStringIsStartOrEnd(message.nodeId)) {
 			console.log('%s has no related line num', message.nodeId);
 			this.clearEditor(editor);
 			this.clearHighlightInWebviewPanel();

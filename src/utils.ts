@@ -6,3 +6,7 @@ export function escapeHtml(text: string): string {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#039;');
 }
+
+export function nodeIdStringIsStartOrEnd(nodeId: string): Boolean {
+    return nodeId === "Start" || nodeId === "End";
+}

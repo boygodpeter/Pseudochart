@@ -7,7 +7,7 @@ import { WebviewEventHandler } from './Webview/WebviewEventHandler';
 import { getWebviewHtmlExternal } from "./Webview/HtmlTemplateLoader";
 import type { AppState } from './state';
 import { createInitialAppState } from './state';
-import { escapeHtml as escapeHtmlUtil } from './utils';
+import { escapeHtml as escapeHtmlUtil, nodeIdStringIsStartOrEnd} from './utils';
 
 export let sourceDocUri: vscode.Uri | undefined;
 export let currentPanel: vscode.WebviewPanel | undefined;
@@ -390,9 +390,6 @@ function updateWebviewPseudocode(state: AppState) {
 
 
 
-export function nodeIdStringIsStartOrEnd(nodeId: string): Boolean {
-    return nodeId === "Start" || nodeId === "End";
-}
 
 function parseLineMapping(mappingStr: string, state?: AppState): Map<number, string[]> {
     const map = new Map<number, string[]>();
@@ -403,13 +400,15 @@ function parseLineMapping(mappingStr: string, state?: AppState): Map<number, str
         
         for (const [line, nodes] of Object.entries(mapping)) {
             const lineNum = parseInt(line);
-            map.set(lineNum, nodes as string[]);
-            console.log(`Line ${lineNum} maps to nodes:`, nodes);
-
             const arr = nodes as string[];
-            let tempNodeId: string = arr[0];
-            nodeIdToLine.set(tempNodeId, lineNum);
-            if (state) {state.nodeIdToLine.set(tempNodeId, lineNum);}
+            map.set(lineNum, arr);
+            console.log(`Line ${lineNum} maps to nodes:`, arr);
+            
+            // Register ALL node ids for this line
+            for (const nodeId of arr) {
+                nodeIdToLine.set(nodeId, lineNum);
+                if (state) {state.nodeIdToLine.set(nodeId, lineNum);}
+            }
         }
     } catch (e) {
         console.error('Error parsing line mapping:', e);
