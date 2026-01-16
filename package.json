@@ -1,0 +1,86 @@
+{
+  "name": "code2pseudocode-flowchart",
+  "displayName": "Code2Pseudocode & Flowchart Generator",
+  "description": "Convert Python code to pseudocode and generate interactive flowcharts",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "m5-test2.generate",
+        "title": "Generate Flowchart (WebView)"
+      },
+      {
+        "command": "code2pseudocode.convertToPseudocode",
+        "title": "Convert to Pseudocode",
+        "category": "Code2Pseudocode"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceExtname == .py",
+          "command": "m5-test2.generate",
+          "group": "navigation"
+        },
+        {
+          "command": "code2pseudocode.convertToPseudocode",
+          "when": "resourceExtname == .py",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Gemini",
+      "properties": {
+        "gemini.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Google AI Studio API key for Gemini. Leave blank to use environment variable GEMINI_API_KEY."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.7",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "dotenv": "^17.2.1",
+    "@google/generative-ai": "^0.24.1",
+    "flowchart.js": "^1.18.0",
+    "mermaid": "^11.8.1"
+  }
+}

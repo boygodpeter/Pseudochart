@@ -1,0 +1,11 @@
+average sum of square error:
+m order = 3, sum of square error:[0.03983929]
+m order = 4, sum of square error:[0.03137921]
+m order = 5, sum of square error:[0.00464428]
+m order = 6, sum of square error:[0.00457504]
+m order = 7, sum of square error:[0.00443079]
+m order = 8, sum of square error:[0.0044275]
+m order = 9, sum of square error:[0.00442665]
+m order = 10, sum of square error:[0.00443197]
+m order = 11, sum of square error:[0.00555951]
+m order = 12, sum of square error:[1.07759229]
