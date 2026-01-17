@@ -7,14 +7,12 @@ import { WebviewEventHandler } from './Webview/WebviewEventHandler';
 import { getWebviewHtmlExternal } from "./Webview/HtmlTemplateLoader";
 import type { AppState } from './state';
 import { createInitialAppState } from './state';
-import { escapeHtml as escapeHtmlUtil, nodeIdStringIsStartOrEnd} from './utils';
+// import { escapeHtml } from './utils';
 
-export let sourceDocUri: vscode.Uri | undefined;
-export let currentPanel: vscode.WebviewPanel | undefined;
 let nodeOrder: string[] = [];
 
 const pseudocodeCache = new Map<string, string>();
-let pseudocodeHistory: string[] = [];
+// pseudocodeHistory moved into AppState; no module-level pseudocodeHistory
 
 // mapping relation
 // @Param:
@@ -22,11 +20,7 @@ let pseudocodeHistory: string[] = [];
 //    currentLineMapping  : ?
 //    pseudocodeToLineMap : map 'lineno-of-pseudocode : number' to 'lineno-of-code : number'
 //    nodeIdToLine        : map 'nodeId-of-flowchart-element : string' to 'lineno-of-code : number'
-export let lineToNodeMap: Map<number, string[]> = new Map();
-let currentLineMapping: Array<{pythonLine: number, pseudocodeLine: number}> = [];
-export let pseudocodeToLineMap: Map<number, number> = new Map();
-export let fullPseudocodeGenerated = false;
-export const nodeIdToLine = new Map<string, number | null>();
+// Migration complete: mappings and related state are stored in AppState (appState.*)
 
 export function activate(context: vscode.ExtensionContext) {
     const extensionPath = context.extensionPath;
@@ -52,8 +46,6 @@ export function activate(context: vscode.ExtensionContext) {
 
             if (hasRealChanges) {
                 pseudocodeCache.clear();
-                currentLineMapping = [];
-                fullPseudocodeGenerated = false;
                 // keep appState in sync
                 appState.currentLineMapping = [];
                 appState.fullPseudocodeGenerated = false;
@@ -76,7 +68,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const code = document.getText();
-        sourceDocUri = editor.document.uri;
         appState.sourceDocUri = editor.document.uri;
         
         try {
@@ -87,24 +78,23 @@ export function activate(context: vscode.ExtensionContext) {
             console.log('Line mapping:', lineMapping);
             console.log('Node sequence:', nodeSequence);
 
-            pseudocodeHistory = [];
+            // use AppState as single source of truth for pseudocode history
             appState.pseudocodeHistory = [];
             
             let pseudocodeText = '等待生成 Pseudocode...';
             
             const parsedMap = parseLineMapping(lineMapping, appState);
-            lineToNodeMap = parsedMap;
             appState.lineToNodeMap = parsedMap;
             console.log('Parsed line to node map:', Array.from(parsedMap.entries()));
             
             nodeOrder = await parseNodeSequence(nodeSequence, nodeMeta, code);
             console.log('Node order:', nodeOrder);
             
-            if (currentPanel) {
-                currentPanel.reveal(vscode.ViewColumn.Two);
-                appState.panel = currentPanel;
+            if (appState.panel) {
+                appState.panel.reveal(vscode.ViewColumn.Two);
             } else {
-                currentPanel = vscode.window.createWebviewPanel(
+                // create the panel and set AppState as the single source
+                const panel = vscode.window.createWebviewPanel(
                     'pythonFlowchart',
                     'Python Flowchart',
                     vscode.ViewColumn.Two,
@@ -115,34 +105,28 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 );
 
-                currentPanel.onDidDispose(() => {
-                    currentPanel = undefined;
-                    // setWebviewPanel(undefined);
-                    pseudocodeHistory = [];
-                    currentLineMapping = [];
-                    pseudocodeToLineMap.clear();
-                    fullPseudocodeGenerated = false;
+                panel.onDidDispose(() => {
+                    // clear AppState; remove legacy shims entirely
                     appState.panel = undefined;
                     appState.pseudocodeHistory = [];
                     appState.currentLineMapping = [];
                     appState.pseudocodeToLineMap.clear();
                     appState.fullPseudocodeGenerated = false;
                 });
-                appState.panel = currentPanel;
+
+                appState.panel = panel;
             }
 
-            // 設置 webview panel 引用
-            // setWebviewPanel(currentPanel);
-
-            currentPanel.webview.html = await getWebviewHtmlExternal(
-                currentPanel.webview,
+            // use appState.panel for webview interactions
+            appState.panel!.webview.html = await getWebviewHtmlExternal(
+                appState.panel!.webview,
                 context,
                 mermaidCode,
                 nodeOrder,
                 getPseudocodeHistoryText(appState)
             );
             
-            currentPanel.webview.onDidReceiveMessage(
+            appState.panel!.webview.onDidReceiveMessage(
                 message => {
                     switch (message.command) {
                         case 'webview.FlowchartNodeClicked':
@@ -152,10 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
                             handler.clearEditor(editor);
                             break;
                         case 'webview.clearPseudocodeHistory':
-                            pseudocodeHistory = [];
-                            currentLineMapping = [];
-                            pseudocodeToLineMap.clear();
-                            fullPseudocodeGenerated = false;
+                            // clear history via AppState only
                             appState.pseudocodeHistory = [];
                             appState.currentLineMapping = [];
                             appState.pseudocodeToLineMap.clear();
@@ -181,10 +162,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const clearHistoryDisposable = vscode.commands.registerCommand('code2pseudocode.clearHistory', () => {
-        pseudocodeHistory = [];
-        currentLineMapping = [];
-        pseudocodeToLineMap.clear();
-        fullPseudocodeGenerated = false;
+        // clear AppState history
         appState.pseudocodeHistory = [];
         appState.currentLineMapping = [];
         appState.pseudocodeToLineMap.clear();
@@ -194,7 +172,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     
     let selectionDisposable = vscode.window.onDidChangeTextEditorSelection((e) => {
-        if (!currentPanel) {
+        if (!appState.panel) {
             return;
         }
 
@@ -202,7 +180,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (!editor || editor.document.languageId !== 'python') {
             return;
         }
-        if (editor.document.uri !== sourceDocUri) {
+        if (editor.document.uri !== appState.sourceDocUri) {
             console.error('current editor is not where the flowchart come from');
             return;
         }
@@ -357,13 +335,13 @@ function handlePseudocodeLinesClick(pseudocodeLines: number[], state: AppState, 
         vscode.window.showErrorMessage('無法打開源文件: ' + error);
     });
  }
- function addToPseudocodeHistory(pseudocode: string) {
-     pseudocodeHistory.push(pseudocode);
-     const maxHistory = 50;
-     if (pseudocodeHistory.length > maxHistory) {
-         pseudocodeHistory = pseudocodeHistory.slice(-maxHistory);
-     }
- }
+function addToPseudocodeHistory(state: AppState, pseudocode: string) {
+    const maxHistory = 50;
+    state.pseudocodeHistory.push(pseudocode);
+    if (state.pseudocodeHistory.length > maxHistory) {
+        state.pseudocodeHistory = state.pseudocodeHistory.slice(-maxHistory);
+    }
+}
 
 function getPseudocodeHistoryText(state: AppState): string {
     if (state.pseudocodeHistory.length === 0) {
@@ -404,10 +382,9 @@ function parseLineMapping(mappingStr: string, state?: AppState): Map<number, str
             map.set(lineNum, arr);
             console.log(`Line ${lineNum} maps to nodes:`, arr);
             
-            // Register ALL node ids for this line
+            // Register ALL node ids for this line (store in AppState)
             for (const nodeId of arr) {
-                nodeIdToLine.set(nodeId, lineNum);
-                if (state) {state.nodeIdToLine.set(nodeId, lineNum);}
+                if (state) { state.nodeIdToLine.set(nodeId, lineNum); }
             }
         }
     } catch (e) {
@@ -490,34 +467,26 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
             console.log('Received line mapping:', result.lineMapping);
             console.log('Pseudocode lines:', result.pseudocode.split('\n').length);
             
-            // put mapping into AppState (and keep globals in sync)
+            // Put mapping into AppState (AppState is the single source of truth)
             state.currentLineMapping = result.lineMapping;
-            currentLineMapping = result.lineMapping;
-
             state.pseudocodeToLineMap.clear();
-            pseudocodeToLineMap.clear();
             result.lineMapping.forEach(mapping => {
                 state.pseudocodeToLineMap.set(mapping.pseudocodeLine, mapping.pythonLine);
-                pseudocodeToLineMap.set(mapping.pseudocodeLine, mapping.pythonLine);
             });
             console.log('Pseudocode to line map created:', Array.from(state.pseudocodeToLineMap.entries()));
 
-            // 設置映射到 WebviewEventHandler (state used by handler)
-            state.pseudocodeHistory = [];
-            addToPseudocodeHistory(result.pseudocode);
-            state.pseudocodeHistory = pseudocodeHistory;
+            // Update pseudocode history and flags in AppState
+            addToPseudocodeHistory(state, result.pseudocode);
             state.fullPseudocodeGenerated = true;
-            fullPseudocodeGenerated = true;
 
             updateWebviewPseudocode(state);
             
             progress.report({ increment: 30, message: "完成！" });
-            
-            console.log('Total mappings created:', currentLineMapping.length);
+            console.log('Total mappings created:', state.currentLineMapping.length);
             vscode.window.showInformationMessage(
-                `Pseudocode 生成完成！已映射 ${currentLineMapping.length} 行程式碼`
+                `Pseudocode 生成完成！已映射 ${state.currentLineMapping.length} 行程式碼`
             );
-
+ 
         } catch (error) {
             console.error('轉換失敗:', error);
             if (!isAutoUpdate) {
@@ -527,13 +496,6 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
     });
  }
 
-export function escapeHtml(text: string): string {
-	// delegate to utils to avoid coupling HtmlTemplateLoader -> extension
-	return escapeHtmlUtil(text);
-}
- 
 export function deactivate() {
-    if (currentPanel) {
-        currentPanel.dispose();
-    }
+    // no-op: panels are tracked in AppState and will be cleaned up by the host
 }

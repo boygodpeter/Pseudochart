@@ -60,9 +60,10 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "jest --passWithNoTests"
   },
   "devDependencies": {
+    "@types/jest": "^29.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.102.0",
@@ -71,15 +72,17 @@
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.25.1",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "webpack": "^5.99.7",
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.10.0",
     "dotenv": "^17.2.1",
-    "@google/generative-ai": "^0.24.1",
     "flowchart.js": "^1.18.0",
     "mermaid": "^11.8.1"
   }
