@@ -21,6 +21,13 @@ export class WebviewEventHandler {
 	// 		1. highlight correspond line in TextEditor of orignal code
 	// 		2. highlight correspond line in pseudo code
 	public async handleFlowchartNodeClick(message: any): Promise<void> {
+		if (this.state.mappingDirty) {
+			const warn = '檔案空白/換行已變動，行號映射已失效；復原增加的換行，或重新生成流程圖/偽代碼。';
+			console.warn(warn);
+			vscode.window.showWarningMessage(warn);
+			return;
+		}
+
 		const editor = await this.getSourceEditor();
 		console.log('receive message: nodeClicked %s', message.nodeId);
 
@@ -72,6 +79,13 @@ export class WebviewEventHandler {
 	// 		2. highlight correspond line in pseudo code
 	// 		3. highlight correspond node in flowchart
 	public async handlePseudocodeLineClick(pseudocodeLine: number): Promise<void> {
+		if (this.state.mappingDirty) {
+			const warn = '檔案空白/換行已變動，行號映射已失效；復原增加的換行，或重新生成流程圖/偽代碼。';
+			console.warn(warn);
+			vscode.window.showWarningMessage(warn);
+			return;
+		}
+
 		const editor = await this.getSourceEditor();
 
 		console.log('Pseudocode line clicked:', pseudocodeLine);
@@ -126,6 +140,10 @@ export class WebviewEventHandler {
 		}
 
 		// 不可見就打開它 -- intentionally omitted to avoid race conditions
+		// 若焦點不在來源檔，提示並略過高亮，避免閃爍/誤高亮
+		const warn = '目前文字編輯器所在畫面(VScode 左半邊)，不是產生流程圖的來源檔；已取消 highlight，請切回原檔後再試。';
+		console.warn(warn);
+		vscode.window.showWarningMessage(warn);
 		return;
 	}
 

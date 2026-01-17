@@ -6,13 +6,16 @@ import { parsePythonWithAST } from './pythonAnalyzer';
 import { WebviewEventHandler } from './Webview/WebviewEventHandler';
 import { getWebviewHtmlExternal } from "./Webview/HtmlTemplateLoader";
 import type { AppState } from './state';
-import { createInitialAppState } from './state';
+import { createInitialAppState, resetAppState, markMappingDirty } from './state';
+import { hashNormalizedText } from './utils/normalize';
 // import { escapeHtml } from './utils';
 
-let nodeOrder: string[] = [];
-
-const pseudocodeCache = new Map<string, string>();
 // pseudocodeHistory moved into AppState; no module-level pseudocodeHistory
+// reset helper to centralize clearing derived state (mapping/history/cache)
+function resetGeneratedState(state: AppState, options: { keepPanel?: boolean } = {}) {
+    console.log("resetGeneratedState is invoke\n");
+    resetAppState(state, { keepPanel: options.keepPanel });
+}
 
 // mapping relation
 // @Param:
@@ -39,16 +42,36 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const onChangeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
-        if (event.contentChanges.length > 0) {
-            const hasRealChanges = event.contentChanges.some(change => {
-                return change.text.trim() !== '' || change.rangeLength > 0;
-            });
+        if (event.contentChanges.length === 0) {
+            return;
+        }
 
-            if (hasRealChanges) {
-                pseudocodeCache.clear();
-                // keep appState in sync
-                appState.currentLineMapping = [];
-                appState.fullPseudocodeGenerated = false;
+        const newHash = hashNormalizedText(event.document.getText());
+        const newLineCount = event.document.lineCount;
+        const prevHash = appState.lastNormalizedHash;
+        const prevLineCount = appState.lastLineCount;
+
+        // 尚未建立基準，先建立基準後返回
+        if (!prevHash || !prevLineCount) {
+            appState.lastNormalizedHash = newHash;
+            appState.lastLineCount = newLineCount;
+            return;// 後面無須判斷
+        }
+
+        // 語義變動：正則化後的 hash 改變，判定為實質修改
+        if (newHash !== prevHash) {
+            resetGeneratedState(appState, { keepPanel: true });
+            appState.lastNormalizedHash = newHash;
+            appState.lastLineCount = newLineCount;
+            vscode.window.showWarningMessage('檔案已修改，請重新生成流程圖/偽代碼。');
+        }
+        else{ // newHash === prevHash
+            // 語義未變但行數變動（純空白/換行），行號映射失效
+            if (newLineCount !== prevLineCount) {
+                markMappingDirty(appState);
+                // newHash === prevHash
+                appState.lastLineCount = newLineCount;
+                vscode.window.showWarningMessage('檔案空白/換行已變動，行號映射已失效；復原空白字元，或重新生成流程圖/偽代碼。');
             }
         }
     });
@@ -68,6 +91,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const code = document.getText();
+        // 建立語義 hash/行數基準，用於後續變更判斷
+        appState.lastNormalizedHash = hashNormalizedText(code);
+        appState.lastLineCount = document.lineCount;
         appState.sourceDocUri = editor.document.uri;
         
         try {
@@ -87,8 +113,8 @@ export function activate(context: vscode.ExtensionContext) {
             appState.lineToNodeMap = parsedMap;
             console.log('Parsed line to node map:', Array.from(parsedMap.entries()));
             
-            nodeOrder = await parseNodeSequence(nodeSequence, nodeMeta, code);
-            console.log('Node order:', nodeOrder);
+            appState.nodeOrder = await parseNodeSequence(nodeSequence, nodeMeta, code);
+            console.log('Node order:', appState.nodeOrder);
             
             if (appState.panel) {
                 appState.panel.reveal(vscode.ViewColumn.Two);
@@ -107,11 +133,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 panel.onDidDispose(() => {
                     // clear AppState; remove legacy shims entirely
-                    appState.panel = undefined;
-                    appState.pseudocodeHistory = [];
-                    appState.currentLineMapping = [];
-                    appState.pseudocodeToLineMap.clear();
-                    appState.fullPseudocodeGenerated = false;
+                    resetGeneratedState(appState, { keepPanel: false });
                 });
 
                 appState.panel = panel;
@@ -122,7 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
                 appState.panel!.webview,
                 context,
                 mermaidCode,
-                nodeOrder,
+                appState.nodeOrder,
                 getPseudocodeHistoryText(appState)
             );
             
@@ -163,10 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const clearHistoryDisposable = vscode.commands.registerCommand('code2pseudocode.clearHistory', () => {
         // clear AppState history
-        appState.pseudocodeHistory = [];
-        appState.currentLineMapping = [];
-        appState.pseudocodeToLineMap.clear();
-        appState.fullPseudocodeGenerated = false;
+        resetGeneratedState(appState, { keepPanel: true });
         updateWebviewPseudocode(appState);
         vscode.window.showInformationMessage('Pseudocode history cleared');
     });
@@ -181,7 +200,9 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
         if (editor.document.uri !== appState.sourceDocUri) {
-            console.error('current editor is not where the flowchart come from');
+		    const warn = '目前文字編輯器所在畫面(VScode 左半邊)，不是產生流程圖的來源檔，已取消 highlight，請切回原檔後再試。';
+            console.warn(warn);
+            vscode.window.showWarningMessage(warn);
             return;
         }
 
@@ -478,6 +499,7 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
             // Update pseudocode history and flags in AppState
             addToPseudocodeHistory(state, result.pseudocode);
             state.fullPseudocodeGenerated = true;
+            state.mappingDirty = false;
 
             updateWebviewPseudocode(state);
             

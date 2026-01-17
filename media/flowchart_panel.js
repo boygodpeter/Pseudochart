@@ -107,8 +107,8 @@ mermaidContainer.addEventListener('click', (e) => {
 	if (rawId.includes('Start')) nodeId = 'Start';
 	if (rawId.includes('End'))   nodeId = 'End';
 
+	// 將決策交給後端（避免前端先高亮再被清空閃爍）
 	vscode.postMessage({ command: 'webview.FlowchartNodeClicked', nodeId });
-	highlightNodes([nodeId]);
 });
 
 // D) Flowchart interactions
