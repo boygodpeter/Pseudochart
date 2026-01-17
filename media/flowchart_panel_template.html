@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none';
+            img-src %%CSP_SOURCE%% data:;
+            script-src %%CSP_SOURCE%% 'nonce-%%NONCE%%';
+            style-src %%CSP_SOURCE%% 'unsafe-inline';
+            font-src %%CSP_SOURCE%%;">
+<!-- 形如「 %%TEXT%% 」的佔位符，會在被 "extension.ts" 載入時替換成真正的 content；
+	這個檔案無法單獨開啟 -->
+<!--
+	CSP for VS Code Webview limit:
+	default deny, allow images/scripts/styles/fonts from webview resources.
+	Scripts require nonce; styles allow inline CSS.
+-->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flowchart</title>
+
+    <link rel="stylesheet" href="%%FLOWCHART_PANEL_CSS_URI%%">                     <!-- Load the CSS -->
+    <script nonce="%%NONCE%%" src="%%MERMAID_JS_URI%%" defer></script>     		   <!-- Load the JavaScripts Mermaid -->
+    <script nonce="%%NONCE%%" src="%%FLOWCHART_PANEL_JS_URI%%" defer></script>     <!-- Load the JavaScripts, Frontend Logic: "flowchart_panel.js" -->
+
+<!-- About load the JavaScripts
+    - 要確保：mermaid.min.js 比 flowchart_panel.js 先載入 
+	>>>> "flowchart_panel.js" 裡面會用到 mermaid，使用 "defer" 確保 mermaid 先 load 進來 -->
+<!-- 形如「 %%TEXT%% 」的佔位符，會在被 "extension.ts" 載入時替換成真正的 content；
+	這個檔案無法單獨開啟 -->
+</head>
+<body>
+    <div class="output-section">
+        <div class="output-header">
+        </div>
+        <div class="output-content" id="pseudocode-content">
+        </div>
+    </div>
+
+    <div class="flowchart-section">
+        
+        <div id="mermaid-container">
+            <div class="zoom-indicator" id="zoomIndicator">100%</div>
+            <div class="drag-indicator" id="dragIndicator">Pan Mode</div>
+            <div id="mermaid-wrapper">
+                <div class="mermaid" id="flowchart">%%MERMAID_CODE%%</div>
+				<!-- 形如「 %%TEXT%% 」的佔位符，會在被 "extension.ts" 載入時替換成真正的 content；
+					這個檔案無法單獨開啟 -->
+            </div>
+        </div>
+    </div>
+
+    <script type="application/json" id="node-order-json" nonce="%%NONCE%%">%%NODE_ORDER_JSON%%</script>
+	<!-- 形如「 %%TEXT%% 」的佔位符，會在被 "extension.ts" 載入時替換成真正的 content；
+		這個檔案無法單獨開啟 -->
+</body>
+</html>
