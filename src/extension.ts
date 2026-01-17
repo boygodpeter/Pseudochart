@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import { parsePythonWithAST } from './pythonAnalyzer';
 import { WebviewEventHandler } from './Webview/WebviewEventHandler';
 import { getWebviewHtmlExternal } from "./Webview/HtmlTemplateLoader";
+import { WebviewMessageRouter } from './Webview/WebviewMessageRouter';
 import type { AppState } from './state';
 import { createInitialAppState, resetAppState, markMappingDirty } from './state';
 import { hashNormalizedText } from './utils/normalize';
@@ -32,6 +33,10 @@ export function activate(context: vscode.ExtensionContext) {
     // create centralized state and handler (injected)
     const appState: AppState = createInitialAppState();
     const handler = new WebviewEventHandler(appState);
+    const router = new WebviewMessageRouter(appState, handler, {
+        updatePseudocode: updateWebviewPseudocode,
+        handlePseudocodeLinesClick: handlePseudocodeLinesClick,
+    });
 
     console.log('Code2Pseudocode extension is now active!');
     console.log('Extension path:', extensionPath);
@@ -150,29 +155,7 @@ export function activate(context: vscode.ExtensionContext) {
             
             appState.panel!.webview.onDidReceiveMessage(
                 message => {
-                    switch (message.command) {
-                        case 'webview.FlowchartNodeClicked':
-                            handler.handleFlowchartNodeClick(message);
-                            break;
-                        case 'webview.requestClearEditor':
-                            handler.clearEditor(editor);
-                            break;
-                        case 'webview.clearPseudocodeHistory':
-                            // clear history via AppState only
-                            appState.pseudocodeHistory = [];
-                            appState.currentLineMapping = [];
-                            appState.pseudocodeToLineMap.clear();
-                            appState.fullPseudocodeGenerated = false;
-                            updateWebviewPseudocode(appState);
-                            break;
-                        case 'webview.pseudocodeLineClicked':
-                            handler.handlePseudocodeLineClick(message.pseudocodeLine);
-                            break;
-                        case 'webview.pseudocodeLinesClicked':
-                            console.log('收到 webview.pseudocodeLinesClicked 消息:', message);
-                            handlePseudocodeLinesClick(message.pseudocodeLines, appState, handler);
-                            break;
-                    }
+                    router.handle(message, { editor });
                 },
                 undefined,
                 context.subscriptions

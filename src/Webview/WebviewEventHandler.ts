@@ -1,3 +1,8 @@
+/**
+ * 具體實作邏輯（高亮 editor、高亮 webview、處理 node/pseudocode click），
+ * 需要 AppState & vscode API。
+ */
+
 import * as vscode from 'vscode';
 import type { AppState } from '../state';
 import { nodeIdStringIsStartOrEnd} from '../utils';
