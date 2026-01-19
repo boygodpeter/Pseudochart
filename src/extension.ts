@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { PseudocodeResult } from './services/claudeApi';
 import * as dotenv from 'dotenv';
-import { parsePythonWithAST } from './pythonAnalyzer';
+import { parsePythonWithAST } from './services/pythonAnalyzer';
 import { WebviewEventHandler } from './Webview/WebviewEventHandler';
 import { getWebviewHtmlExternal } from "./Webview/HtmlTemplateLoader";
 import { WebviewMessageRouter } from './Webview/WebviewMessageRouter';
