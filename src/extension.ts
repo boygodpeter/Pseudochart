@@ -9,6 +9,7 @@ import { WebviewMessageRouter } from './Webview/WebviewMessageRouter';
 import type { AppState } from './state';
 import { createInitialAppState, resetAppState, markMappingDirty } from './state';
 import { hashNormalizedText } from './utils/normalize';
+import { parseLineMapping, parseNodeSequence } from './services/mapping';
 // import { escapeHtml } from './utils';
 
 // pseudocodeHistory moved into AppState; no module-level pseudocodeHistory
@@ -369,58 +370,6 @@ function updateWebviewPseudocode(state: AppState) {
         }
     }
 }
-
-
-
-
-function parseLineMapping(mappingStr: string, state?: AppState): Map<number, string[]> {
-    const map = new Map<number, string[]>();
-    try {
-        console.log('Raw line mapping string:', mappingStr);
-        const mapping = JSON.parse(mappingStr);
-        console.log('Parsed JSON mapping:', mapping);
-        
-        for (const [line, nodes] of Object.entries(mapping)) {
-            const lineNum = parseInt(line);
-            const arr = nodes as string[];
-            map.set(lineNum, arr);
-            console.log(`Line ${lineNum} maps to nodes:`, arr);
-            
-            // Register ALL node ids for this line (store in AppState)
-            for (const nodeId of arr) {
-                if (state) { state.nodeIdToLine.set(nodeId, lineNum); }
-            }
-        }
-    } catch (e) {
-        console.error('Error parsing line mapping:', e);
-    }
-    console.log('Final line to node map:', Array.from(map.entries()));
-    return map;
-}
-
-async function parseNodeSequence(sequenceStr: string, nodeMeta: string, fullCode: string): Promise<string[]> {
-    let sequence: string[] = [];
-    try {
-        sequence = JSON.parse(sequenceStr);
-    } catch (e) {
-        console.error('Error parsing node sequence:', e);
-        return ['Error parsing node sequence'];
-    }
-    return sequence;
-}
-
-type NodeMeta = Record<string, { 
-    label: string;
-    escaped_label: string; 
-    line: number | null 
-}>;
-
-function parseNodeMeta(metaStr: string): NodeMeta {
-    try { return JSON.parse(metaStr) as NodeMeta; }
-    catch (e) { console.error('Error parsing node meta:', e); return {}; }
-}
-
-
 async function convertToPseudocode(state: AppState, handler: WebviewEventHandler, isAutoUpdate: boolean = false) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
