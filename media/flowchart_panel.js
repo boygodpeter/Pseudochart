@@ -20,19 +20,30 @@ try {
 }
 
 /* ---------- A) Global state  ---------- */
-let currentScale = 1;
-let currentHighlightedNodes = [];
-let currentHighlightedPseudocodeLines = [];
-let lineMapping = {};
+const state = {
+	currentScale: 1,
+	currentHighlightedNodes: [],
+	currentHighlightedPseudocodeLines: [],
+	lineMapping: {},
+	zoomTimeout: null,
+	dragTimeout: null,
+	isDragging: false,
+	startX: 0,
+	startY: 0,
+	scrollLeft: 0,
+	scrollTop: 0,
+	// 保留 nodeOrder 於 state，方便後端更新與前端使用
+	nodeOrder,
+};
 
-let zoomTimeout = null;
-let dragTimeout = null;
-
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-let scrollLeft = 0;
-let scrollTop = 0;
+/* ---------- A.1) DOM References (cache common nodes) ---------- */
+const dom = {
+	mermaidContainer: document.getElementById('mermaid-container'),
+	zoomIndicator: document.getElementById('zoomIndicator'),
+	dragIndicator: document.getElementById('dragIndicator'),
+	mermaidWrapper: document.getElementById('mermaid-wrapper'),
+	pseudocodeContent: document.getElementById('pseudocode-content'),
+};
 
 
 
@@ -56,14 +67,14 @@ function initMermaidSafe() {
 	});
 	
 	mermaid.init(undefined, document.querySelector('.mermaid')).then(() => {
-		console.log('Mermaid initialized, node order:', nodeOrder);
+		console.log('Mermaid initialized, node order:', state.nodeOrder);
 		centerFlowchart();
 	});
 }
 
 function centerFlowchart() {
-	const container = document.getElementById('mermaid-container');
-	const wrapper = document.getElementById('mermaid-wrapper');
+	const container = dom.mermaidContainer;
+	const wrapper = dom.mermaidWrapper;
 	const flowchart = document.querySelector('.mermaid svg');
 	
 	if (container && wrapper && flowchart) {
@@ -87,9 +98,9 @@ document.addEventListener('DOMContentLoaded', initMermaidSafe);
 
 
 /* ---------- C) DOM References ---------- */
-const mermaidContainer = document.getElementById('mermaid-container');
-const zoomIndicator = document.getElementById('zoomIndicator');
-const dragIndicator = document.getElementById('dragIndicator');
+const mermaidContainer = dom.mermaidContainer;
+const zoomIndicator = dom.zoomIndicator;
+const dragIndicator = dom.dragIndicator;
 
 
 
@@ -99,13 +110,13 @@ const dragIndicator = document.getElementById('dragIndicator');
 // 		-- click related
 mermaidContainer.addEventListener('click', (e) => {
 	const el = e.target.closest('.node');
-	if (!el) return;
+	if (!el) {return;}
 
 	const rawId = el.id || '';
 	let nodeId = rawId.split('-')[1] || rawId;
 
-	if (rawId.includes('Start')) nodeId = 'Start';
-	if (rawId.includes('End'))   nodeId = 'End';
+	if (rawId.includes('Start')) {nodeId = 'Start';}
+	if (rawId.includes('End'))   {nodeId = 'End';}
 
 	// 將決策交給後端（避免前端先高亮再被清空閃爍）
 	vscode.postMessage({ command: 'webview.FlowchartNodeClicked', nodeId });
@@ -115,17 +126,17 @@ mermaidContainer.addEventListener('click', (e) => {
 // 		-- drag related
 
 mermaidContainer.addEventListener('mousemove', (e) => {
-	if (!isDragging) return;
+	if (!state.isDragging) {return;}
 	
 	e.preventDefault();
 	
 	const x = e.pageX - mermaidContainer.offsetLeft;
 	const y = e.pageY - mermaidContainer.offsetTop;
-	const walkX = (x - startX) * 1.5;
-	const walkY = (y - startY) * 1.5;
+	const walkX = (x - state.startX) * 1.5;
+	const walkY = (y - state.startY) * 1.5;
 	
-	mermaidContainer.scrollLeft = scrollLeft - walkX;
-	mermaidContainer.scrollTop = scrollTop - walkY;
+	mermaidContainer.scrollLeft = state.scrollLeft - walkX;
+	mermaidContainer.scrollTop = state.scrollTop - walkY;
 });
 
 mermaidContainer.addEventListener('mousedown', (e) => {
@@ -133,46 +144,46 @@ mermaidContainer.addEventListener('mousedown', (e) => {
 		return;
 	}
 	
-	isDragging = true;
+	state.isDragging = true;
 	mermaidContainer.classList.add('grabbing');
 	
-	startX = e.pageX - mermaidContainer.offsetLeft;
-	startY = e.pageY - mermaidContainer.offsetTop;
-	scrollLeft = mermaidContainer.scrollLeft;
-	scrollTop = mermaidContainer.scrollTop;
+	state.startX = e.pageX - mermaidContainer.offsetLeft;
+	state.startY = e.pageY - mermaidContainer.offsetTop;
+	state.scrollLeft = mermaidContainer.scrollLeft;
+	state.scrollTop = mermaidContainer.scrollTop;
 	
 	dragIndicator.classList.add('visible');
 	
-	if (dragTimeout) {
-		clearTimeout(dragTimeout);
+	if (state.dragTimeout) {
+		clearTimeout(state.dragTimeout);
 	}
 	
 	e.preventDefault();
 });
 
 mermaidContainer.addEventListener('mouseup', () => {
-	if (isDragging) {
-		isDragging = false;
+	if (state.isDragging) {
+		state.isDragging = false;
 		mermaidContainer.classList.remove('grabbing');
 		
-		dragTimeout = setTimeout(() => {
+		state.dragTimeout = setTimeout(() => {
 			dragIndicator.classList.remove('visible');
 		}, 1000);
 	}
 });
 
 mermaidContainer.addEventListener('selectstart', (e) => {
-	if (isDragging) {
+	if (state.isDragging) {
 		e.preventDefault();
 	}
 });
 
 mermaidContainer.addEventListener('mouseleave', () => {
-	if (isDragging) {
-		isDragging = false;
+	if (state.isDragging) {
+		state.isDragging = false;
 		mermaidContainer.classList.remove('grabbing');
 		
-		dragTimeout = setTimeout(() => {
+		state.dragTimeout = setTimeout(() => {
 			dragIndicator.classList.remove('visible');
 		}, 1000);
 	}
@@ -189,31 +200,31 @@ if (e.ctrlKey || e.metaKey) {
 	
 	const zoomSpeed = 0.1;
 	const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
-	const newScale = Math.min(Math.max(0.1, currentScale + delta), 5);
+	const newScale = Math.min(Math.max(0.1, state.currentScale + delta), 5);
 	
-	if (newScale !== currentScale) {
-		currentScale = newScale;
+	if (newScale !== state.currentScale) {
+		state.currentScale = newScale;
 		const mermaidEl = document.querySelector('.mermaid');
-		mermaidEl.style.transform = 'scale(' + currentScale + ')';
+		mermaidEl.style.transform = 'scale(' + state.currentScale + ')';
 		
 		// 動態調整 wrapper 尺寸
-		const wrapper = document.getElementById('mermaid-wrapper');
+		const wrapper = dom.mermaidWrapper;
 		const svg = mermaidEl.querySelector('svg');
 		if (svg) {
-			const scaledWidth = svg.getBoundingClientRect().width * currentScale;
-			const scaledHeight = svg.getBoundingClientRect().height * currentScale;
+			const scaledWidth = svg.getBoundingClientRect().width * state.currentScale;
+			const scaledHeight = svg.getBoundingClientRect().height * state.currentScale;
 			wrapper.style.minWidth = Math.max(3000, scaledWidth + 2000) + 'px';
 			wrapper.style.minHeight = Math.max(3000, scaledHeight + 2000) + 'px';
 		}
 		
-		zoomIndicator.textContent = Math.round(currentScale * 100) + '%';
+		zoomIndicator.textContent = Math.round(state.currentScale * 100) + '%';
 		zoomIndicator.classList.add('visible');
 		
-		if (zoomTimeout) {
-			clearTimeout(zoomTimeout);
+		if (state.zoomTimeout) {
+			clearTimeout(state.zoomTimeout);
 		}
 		
-		zoomTimeout = setTimeout(() => {
+		state.zoomTimeout = setTimeout(() => {
 			zoomIndicator.classList.remove('visible');
 		}, 2000);
 	}
@@ -227,18 +238,21 @@ document.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 function resetView() {
-	currentScale = 1;
-	document.querySelector('.mermaid').style.transform = 'scale(1)';
+	state.currentScale = 1;
+	const mermaidEl = document.querySelector('.mermaid');
+	if (mermaidEl) {
+		mermaidEl.style.transform = 'scale(1)';
+	}
 	centerFlowchart();
 	
 	zoomIndicator.textContent = '100%';
 	zoomIndicator.classList.add('visible');
 	
-	if (zoomTimeout) {
-		clearTimeout(zoomTimeout);
+	if (state.zoomTimeout) {
+		clearTimeout(state.zoomTimeout);
 	}
 	
-	zoomTimeout = setTimeout(() => {
+	state.zoomTimeout = setTimeout(() => {
 		zoomIndicator.classList.remove('visible');
 	}, 2000);
 }
@@ -275,17 +289,17 @@ function findNodeElement(nodeId) {
 }
 
 function clearHighlight() {
-	currentHighlightedNodes.forEach(el => {
+	state.currentHighlightedNodes.forEach(el => {
 		el.classList.remove('highlighted');
 	});
-	currentHighlightedNodes = [];
+	state.currentHighlightedNodes = [];
 }
 
 function clearPseudocodeHighlight() {
-	currentHighlightedPseudocodeLines.forEach(el => {
+	state.currentHighlightedPseudocodeLines.forEach(el => {
 		el.classList.remove('highlighted');
 	});
-	currentHighlightedPseudocodeLines = [];
+	state.currentHighlightedPseudocodeLines = [];
 }
 
 function clearHighlightAndEditor() {
@@ -303,7 +317,7 @@ function highlightNodes(nodeIds) {
 		const element = findNodeElement(nodeId);              // 找到節點元素
 		if (element) {
 			element.classList.add('highlighted');     //加上 highlighted class
-			currentHighlightedNodes.push(element);
+			state.currentHighlightedNodes.push(element);
 			console.log('Highlighted element:', element.id);
 			
 			if (index === 0) {
@@ -313,7 +327,7 @@ function highlightNodes(nodeIds) {
 					inline: 'center'
 				});
 				
-				const container = document.getElementById('mermaid-container');
+				const container = dom.mermaidContainer;
 				const rect = element.getBoundingClientRect();
 				const containerRect = container.getBoundingClientRect();
 				
@@ -329,17 +343,17 @@ function highlightNodes(nodeIds) {
 		}
 	});
 	
-	if (currentHighlightedNodes.length === 0) {
+	if (state.currentHighlightedNodes.length === 0) {
 		console.log('No nodes found to highlight');
 	}
 }
 
 function setLineMapping(mappingArray) {
-	lineMapping = {};
+	state.lineMapping = {};
 	mappingArray.forEach(item => {
-		lineMapping[item.pythonLine] = item.pseudocodeLine;
+		state.lineMapping[item.pythonLine] = item.pseudocodeLine;
 	});
-	console.log('Line mapping set:', lineMapping);
+	console.log('Line mapping set:', state.lineMapping);
 }
 
 function highlightPseudocodeLines(pythonLineNumbers) {
@@ -348,14 +362,14 @@ function highlightPseudocodeLines(pythonLineNumbers) {
 	console.log('Highlighting pseudocode for Python lines:', pythonLineNumbers);
 	
 	pythonLineNumbers.forEach((pythonLine, index) => {
-		const pseudoLine = lineMapping[pythonLine];
+		const pseudoLine = state.lineMapping[pythonLine];
 		
 		if (pseudoLine) {
 			const element = document.getElementById('pseudo-line-' + pseudoLine);
 			
 			if (element) {
 				element.classList.add('highlighted');
-				currentHighlightedPseudocodeLines.push(element);
+				state.currentHighlightedPseudocodeLines.push(element);
 				console.log('Python line', pythonLine, 'mapped to Pseudocode line', pseudoLine);
 				
 				if (index === 0) {
@@ -370,10 +384,10 @@ function highlightPseudocodeLines(pythonLineNumbers) {
 		}
 	});
 	
-	if (currentHighlightedPseudocodeLines.length === 0) {
+	if (state.currentHighlightedPseudocodeLines.length === 0) {
 		console.log('No pseudocode lines found to highlight');
 	} else {
-		console.log('Successfully highlighted', currentHighlightedPseudocodeLines.length, '/', pythonLineNumbers.length, 'lines');
+		console.log('Successfully highlighted', state.currentHighlightedPseudocodeLines.length, '/', pythonLineNumbers.length, 'lines');
 	}
 }
 
@@ -389,8 +403,8 @@ function escapeHtml(text) {
 
 // 在 updatePseudocodeDisplay 函數中修改
 function updatePseudocodeDisplay(pseudocode) {
-	const pseudocodeContent = document.getElementById('pseudocode-content');
-	if (!pseudocodeContent) return;
+	const pseudocodeContent = dom.pseudocodeContent;
+	if (!pseudocodeContent) {return;}
 
 	if (!pseudocode || pseudocode.trim() === '' || pseudocode.trim() === '等待生成 Pseudocode...') {
 		pseudocodeContent.innerHTML = '';
@@ -523,26 +537,32 @@ function clearPseudocodeHistory() {
 //     pseudocodeLines: [2, 3]              
 // }   
 
-window.addEventListener('message', event => {
-	const message = event.data;
+function handleMessage(message) {
+	if (!message || typeof message.command !== 'string') {
+		console.warn('Invalid message payload:', message);
+		return;
+	}
 	console.log('Received message:', message.command);
 	
 	switch (message.command) {
 		case 'highlightNodesAndPseudocode':
-			console.log('Highlighting nodes and pseudocode:', message.nodeIds, message.pseudocodeLines);
-			highlightNodes(message.nodeIds);
-			highlightPseudocodeLines(message.pseudocodeLines);
+			if (Array.isArray(message.nodeIds) && Array.isArray(message.pseudocodeLines)) {
+				highlightNodes(message.nodeIds);
+				highlightPseudocodeLines(message.pseudocodeLines);
+			}
 			break;
 		case 'highlightNodes':
-			highlightNodes(message.nodeIds);
+			if (Array.isArray(message.nodeIds)) {
+				highlightNodes(message.nodeIds);
+			}
 			break;
 		case 'clearHighlight':
 			clearHighlight();
 			clearPseudocodeHighlight();
 			break;
 		case 'setNodeOrder':
-			nodeOrder = message.nodeOrder;
-			console.log('Updated node order:', nodeOrder);
+			state.nodeOrder = message.nodeOrder;
+			console.log('Updated node order:', state.nodeOrder);
 			break;
 		case 'updatePseudocode':
 			updatePseudocodeDisplay(message.pseudocode);
@@ -550,5 +570,9 @@ window.addEventListener('message', event => {
 		case 'setLineMapping':
 			setLineMapping(message.mapping);
 			break;
+		default:
+			console.warn('Unhandled webview message:', message.command);
 	}
-});
+}
+
+window.addEventListener('message', event => handleMessage(event.data));
