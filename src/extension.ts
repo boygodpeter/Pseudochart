@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { codeToPseudocode, PseudocodeResult } from './claudeApi';
+import { PseudocodeResult } from './services/claudeApi';
 import * as dotenv from 'dotenv';
 import { parsePythonWithAST } from './pythonAnalyzer';
 import { WebviewEventHandler } from './Webview/WebviewEventHandler';
@@ -10,6 +10,7 @@ import type { AppState } from './state';
 import { createInitialAppState, resetAppState, markMappingDirty } from './state';
 import { hashNormalizedText } from './utils/normalize';
 import { parseLineMapping, parseNodeSequence } from './services/mapping';
+import { requestPseudocode } from './services/llm';
 // import { escapeHtml } from './utils';
 
 // pseudocodeHistory moved into AppState; no module-level pseudocodeHistory
@@ -413,23 +414,33 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
         try {
             progress.report({ increment: 30, message: "正在呼叫 Claude API..." });
             
-            const result: PseudocodeResult = await codeToPseudocode(fullCode);
+            const result = await requestPseudocode(fullCode);
+
+            if (!result.ok) {
+                console.error('轉換失敗:', result.error);
+                if (!isAutoUpdate) {
+                    vscode.window.showErrorMessage(`轉換失敗: ${result.error}`);
+                }
+                return;
+            }
+
+            const data: PseudocodeResult = result.data;
             
             progress.report({ increment: 40, message: "正在處理結果..." });
             
-            console.log('Received line mapping:', result.lineMapping);
-            console.log('Pseudocode lines:', result.pseudocode.split('\n').length);
+            console.log('Received line mapping:', data.lineMapping);
+            console.log('Pseudocode lines:', data.pseudocode.split('\n').length);
             
             // Put mapping into AppState (AppState is the single source of truth)
-            state.currentLineMapping = result.lineMapping;
+            state.currentLineMapping = data.lineMapping;
             state.pseudocodeToLineMap.clear();
-            result.lineMapping.forEach(mapping => {
+            data.lineMapping.forEach(mapping => {
                 state.pseudocodeToLineMap.set(mapping.pseudocodeLine, mapping.pythonLine);
             });
             console.log('Pseudocode to line map created:', Array.from(state.pseudocodeToLineMap.entries()));
 
             // Update pseudocode history and flags in AppState
-            addToPseudocodeHistory(state, result.pseudocode);
+            addToPseudocodeHistory(state, data.pseudocode);
             state.fullPseudocodeGenerated = true;
             state.mappingDirty = false;
 
