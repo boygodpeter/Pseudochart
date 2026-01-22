@@ -69,7 +69,7 @@ npm run compile
 
 ### 方式 B (只想使用功能)
 
-1.在Github上面下載 PseudoChart, Code2Pseudocode & Flowchart Generator  
+1.在Github上面下載 "pseudo-chart-0.0.1.vsix"  
 2. 打開 VS Code  
 3. Extensions → 右上角 `...` → **Install from VSIX...**  
 4. 選擇提供的 `*.vsix`  
