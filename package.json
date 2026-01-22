@@ -1,8 +1,12 @@
 {
-  "name": "code2pseudocode-flowchart",
-  "displayName": "Code2Pseudocode & Flowchart Generator",
+  "name": "pseudo-chart",
+  "displayName": "PseudoChart, Code2Pseudocode & Flowchart Generator",
   "description": "Convert Python code to pseudocode and generate interactive flowcharts",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boygodpeter/m5_test2.git"
+  },
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -38,6 +42,16 @@
           "group": "1_modification"
         }
       ]
+    },
+    "configuration": {
+      "title": "PseudoChart",
+      "properties": {
+        "pseudoChart.claudeApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Claude (Anthropic) API key. Recommended: set via environment variable `CLAUDE_API_KEY` instead of Settings if you don't want to store secrets in VS Code settings."
+        }
+      }
     }
   },
   "scripts": {
@@ -61,6 +75,7 @@
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
     "eslint": "^9.25.1",
     "jest": "^29.0.0",
     "ts-jest": "^29.0.0",

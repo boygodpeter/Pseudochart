@@ -42,7 +42,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     console.log('Code2Pseudocode extension is now active!');
     console.log('Extension path:', extensionPath);
-    console.log('CLAUDE_API_KEY exists:', !!process.env.CLAUDE_API_KEY);
     
     const disposable = vscode.commands.registerCommand('code2pseudocode.convertToPseudocode', async () => {
         await convertToPseudocode(appState, handler);
@@ -398,10 +397,17 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
         return;
     }
 
-    const apiKey = process.env.CLAUDE_API_KEY;
+    const configKey = vscode.workspace.getConfiguration('pseudoChart').get<string>('claudeApiKey')?.trim();
+    const apiKey = configKey || process.env.CLAUDE_API_KEY;
     if (!apiKey) {
         if (!isAutoUpdate) {
-            vscode.window.showErrorMessage('找不到 CLAUDE_API_KEY，請檢查 .env 檔案');
+            const selection = await vscode.window.showErrorMessage(
+                '找不到 Claude API Key，請到 Settings 設定 pseudoChart.claudeApiKey（或設定環境變數 CLAUDE_API_KEY）。',
+                'Open Settings'
+            );
+            if (selection === 'Open Settings') {
+                await vscode.commands.executeCommand('workbench.action.openSettings', 'pseudoChart.claudeApiKey');
+            }
         }
         return;
     }
@@ -414,7 +420,7 @@ async function convertToPseudocode(state: AppState, handler: WebviewEventHandler
         try {
             progress.report({ increment: 30, message: "正在呼叫 Claude API..." });
             
-            const result = await requestPseudocode(fullCode);
+            const result = await requestPseudocode(fullCode, apiKey);
 
             if (!result.ok) {
                 console.error('轉換失敗:', result.error);

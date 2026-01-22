@@ -8,9 +8,9 @@ export type LLMResult =
 	| { ok: false; error: string };
 
 // 封裝 LLM 請求，統一錯誤訊息格式，避免在入口灑落 try/catch
-export async function requestPseudocode(code: string): Promise<LLMResult> {
+export async function requestPseudocode(code: string, apiKey: string): Promise<LLMResult> {
 	try {
-		const data = await codeToPseudocode(code);
+		const data = await codeToPseudocode(code, apiKey);
 		return { ok: true, data };
 	} catch (err: any) {
 		const message = err?.message ? String(err.message) : '未知錯誤';

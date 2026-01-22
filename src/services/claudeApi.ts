@@ -119,13 +119,9 @@ function buildLineMapping(pythonCode: string, pseudocode: string): LineMapping[]
     return mapping;
 }
 
-export async function codeToPseudocode(code: string): Promise<PseudocodeResult> {
-    const apiKey = process.env.CLAUDE_API_KEY;
-    console.log('在 claudeApi.ts 中檢查 API Key:', !!apiKey);
-    console.log('所有環境變數:', Object.keys(process.env).filter(key => key.includes('CLAUDE')));
-
+export async function codeToPseudocode(code: string, apiKey: string): Promise<PseudocodeResult> {
     if (!apiKey) {
-        throw new Error('找不到 CLAUDE_API_KEY，請檢查 .env 檔案。當前環境變數中沒有此 Key。');
+        throw new Error('找不到 Claude API Key（請設定 pseudoChart.claudeApiKey 或環境變數 CLAUDE_API_KEY）');
     }
 
     if (!code || code.trim() === '') {

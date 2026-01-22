@@ -42,28 +42,20 @@ npm run compile
 ```
 然後用 VS Code 開啟此資料夾，按 `F5` 啟動 Extension Development Host。
 
-### （維護者）如何產生 VSIX
-
-> 這段是給「打包交付的人」用；一般使用者只需要安裝 VSIX。
-
-1. 在 `PseudoChart/` 內先 build：`npm install` → `npm run package`
-2. 使用 `@vscode/vsce` 打包：`npx @vscode/vsce package`
-3. 產出的 `*.vsix` 就是可交付/可安裝檔案
-
-注意：安裝 `@vscode/vsce` 可能需要網路（第一次設定時）。
-
 ---
 
 ## 設定（Configuration）
 
 ### LLM API Key（目前：Claude / Anthropic）
 
-本專案目前主要使用環境變數：
+本專案提供兩種方式設定 API key（擇一）：
+
+1) **VS Code Settings（建議給一般使用者）**
+- 在 Settings 搜尋：`pseudoChart.claudeApiKey`
+- 或到 Extensions → 本 extension → ⚙ → Extension Settings
+
+2) **環境變數（較安全，不想把 key 存在 Settings 可用這個）**
 - `CLAUDE_API_KEY`
-
-設定方式（擇一）：
-
-1) **環境變數（建議）**
 - Windows（PowerShell）：
   ```powershell
   setx CLAUDE_API_KEY "<your-key>"
@@ -75,7 +67,7 @@ npm run compile
   export CLAUDE_API_KEY="<your-key>"
   ```
 
-2) **本地 `.env`（僅建議開發/自用）**
+3) **本地 `.env`（僅建議開發/自用）**
 - 放在 extension 根目錄（同 `package.json`）的 `.env`
 - 在 .env 中，用形如 `CLAUDE_API_KEY="<your-key>"` 設定 API key
 
@@ -148,3 +140,10 @@ TODO：清理沒有用的 scripts（例如 watch/lint/test 是否要保留）。
 
 - 維護者：TODO
 - 版本：TODO（ version / commit hash / 打包日期）
+
+
+
+
+npm install  
+npm i -D @vscode/vsce  
+npx vsce package  
