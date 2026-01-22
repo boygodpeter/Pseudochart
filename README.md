@@ -12,34 +12,28 @@
 - **Python → Pseudocode**：透過 LLM 將程式碼轉為偽代碼。
 - **互動式 Webview**：點擊 flowchart, pseudocode, 編輯器(原始程式碼所在處)任一處，都可在其他區域同步 highlight/定位。
 
-// TODO：補上 demo 截圖/動圖（GIF）。
+TODO：補上 demo 截圖/動圖（GIF）。
 
 ---
 
 ## 系統需求（Requirements）
 
 - VS Code：`1.102.0+`
-- Python：`3.7+`（extension 會嘗試 `python3` / `python` / `py`）
-- 網路：若要使用 LLM 產生偽代碼，需要可連外到 API
-
-// TODO: 確認我的系統版本
+- Python：`3.7+`（extension 會嘗試 `python3` / `python` / `py` 不同命令來 spawn python）
+- 網路：若要使用 LLM 產生偽代碼，需要可連線呼叫 API
 
 ---
 
 ## 安裝（Installation）
 
-// TODO: 
-// - 記得先 git archive 成乾淨 repo(?)
-// - 學習如何使用 vsix 打包
-
-### 方式 A：安裝 VSIX（建議交付方式）
+### 方式 A：安裝 VSIX
 
 1. 打開 VS Code
 2. Extensions → 右上角 `...` → **Install from VSIX...**
 3. 選擇提供的 `*.vsix`
 4. 重載（Reload）VS Code
 
-### 方式 B：開發模式（for developers）
+### 方式 B：開發模式
 
 ```bash
 cd PseudoChart
@@ -47,6 +41,16 @@ npm install
 npm run compile
 ```
 然後用 VS Code 開啟此資料夾，按 `F5` 啟動 Extension Development Host。
+
+### （維護者）如何產生 VSIX
+
+> 這段是給「打包交付的人」用；一般使用者只需要安裝 VSIX。
+
+1. 在 `PseudoChart/` 內先 build：`npm install` → `npm run package`
+2. 使用 `@vscode/vsce` 打包：`npx @vscode/vsce package`
+3. 產出的 `*.vsix` 就是可交付/可安裝檔案
+
+注意：安裝 `@vscode/vsce` 可能需要網路（第一次設定時）。
 
 ---
 
@@ -73,13 +77,7 @@ npm run compile
 
 2) **本地 `.env`（僅建議開發/自用）**
 - 放在 extension 根目錄（同 `package.json`）的 `.env`
-- 注意：`.env` **不得交付/不得提交到 git**（請確保被 `.gitignore` 排除）
-
-### VS Code Settings
-
-目前 `package.json` 內有 `gemini.apiKey` 設定項，但程式碼尚未實作 Gemini 流程（保留作未來擴充/待整理）。
-
-// TODO: 直接移除 gemini api 相關設定；這個是捨棄功能 沒有清乾淨的。
+- 在 .env 中，用形如 `CLAUDE_API_KEY="<your-key>"` 設定 API key
 
 ---
 
@@ -124,18 +122,18 @@ npm run lint
 npm test
 ```
 
-// TODO: 清理沒有用的腳本, watch, lint, test
+TODO：清理沒有用的 scripts（例如 watch/lint/test 是否要保留）。
 
 ---
 
 ## TODO / 後續改進
 
-- 補 README 截圖/動圖
-- 統一 LLM provider 設定（目前 Claude 為主；Gemini 設定待整理）
-- 把 log 轉為 OutputChannel，並加入 debug 開關
-- 未來重構 將 python runtime file 抽出，不要再 runtime 再建立臨時文件執行，看能不能先編譯成 binary，整合進整體框架。
-- 調整錯誤處理機制
-- 調整 name style 並統一
+- [ ]補 README 截圖/動圖
+- [ ]統一 LLM provider 設定（目前 Claude 為主；Gemini 設定待整理）
+- [ ]把 log 轉為 OutputChannel，並加入 debug 開關
+- [ ]未來重構 將 python runtime file 抽出，不要再 runtime 再建立臨時文件執行，看能不能先編譯成 binary，整合進整體框架。
+- [ ]調整錯誤處理機制
+- [ ]調整 name style 並統一
 
 ---
 
